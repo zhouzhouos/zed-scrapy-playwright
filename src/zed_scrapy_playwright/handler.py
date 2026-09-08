@@ -7,6 +7,7 @@
 # from itemadapter import ItemAdapter
 
 
+import scrapy.http
 from playwright.async_api import async_playwright
 from playwright_stealth import Stealth
 from scrapy import Request, crawler, signals
@@ -55,15 +56,31 @@ class PlaywrightDownloaderMiddleware:
                         print("已为 new page 自动施加 Stealth.apply_stealth_async")
                         await Stealth().apply_stealth_async(page)
 
-                    r = await request.execution(request, page)
-                    return Zed.Response(r, request=request)
+                    ret = await request.execution(request, page)
+                    if ret is None:
+                        response = scrapy.http.HtmlResponse(
+                            url=page.url,
+                            status=200,
+                            headers=None,
+                            body=b"",
+                            flags=None,
+                            request=None,
+                            certificate=None,
+                            ip_address=None,
+                            protocol=None,
+                        )
+                        response._encoding = 'utf-8'
+                        response._set_body(await page.content())
+                        return response
+                    else:
+                        return Zed.Response(ret, request=request)
 
                 case _:
                     pass
 
         # 这里处理自动发起的 scrapy.Request 类型，比如 <class 'scrapy.http.request.Request'> wpwp://nothing/robots.txt
         if request.url.startswith(Zed.PREFIX):
-            print("自动请求", request.url)
+            print("自动请求", request.url, '已拦截')
             return Zed.Response("", request=request)
 
         # 其他的寻常的 request 不在这里截留，让其 continue

@@ -70,7 +70,7 @@ class Request(scrapy.Request):
             meta=meta,
             # encoding,
             # priority,
-            # dont_filter,
+            dont_filter=dont_filter,
             # errback,
             # flags,
             # cb_kwargs,
