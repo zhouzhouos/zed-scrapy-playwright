@@ -103,20 +103,27 @@ class PlaywrightDownloaderMiddleware:
         # - return a Request object: stops process_exception() chain
         pass
 
+    @property
+    def has_validate_spider(self):
+        return hasattr(self.c.spider, "config")
+
     async def spider_opened(self, spider=None):
         self.c: crawler.Crawler
-        if not isinstance(self.c.spider, Zed.Spider):
-            print(
-                f"Warning: 该爬虫类没有继承于 {type(self)}，将不会进行此中间件环境的启用",
+        # if not isinstance(self.c.spider, Zed.Spider):
+        #     print(
+        #         f"Warning: 该爬虫类没有继承于 {type(self)}，将不会进行此中间件环境的启用",
+        #     )
+        #     return
+        if self.has_validate_spider:
+            print("spider_opened, start the initialization of async playwright")
+            self.provider = await provider.Provider().init(
+                getattr(self.c.spider, "config", None)
             )
-            return
-
-        print("spider_opened, start the initialization of async playwright")
-        self.provider = await provider.Provider().init(self.c.spider.info)
 
     async def spider_closed(self):
-        if not isinstance(self.c.spider, Zed.Spider):
-            return
+        # if not isinstance(self.c.spider, Zed.Spider):
+        #     return
 
-        print("spider_closed, start the finalizing work of async playwright")
-        await self.provider.close()
+        if self.has_validate_spider:
+            print("spider_closed, start the finalizing work of async playwright")
+            await self.provider.close()

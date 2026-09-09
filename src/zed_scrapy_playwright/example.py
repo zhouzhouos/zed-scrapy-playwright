@@ -6,13 +6,15 @@ from playwright.async_api import Page
 import zed_scrapy_playwright as zsp
 
 
-class ExampleExecutor(zsp.Spider):
+# 配置并自检
+@zsp.enable({"headless": False, "executable_path": "/opt/google/chrome/chrome"})
+class ExampleExecutor(scrapy.Spider):
     name = "example"
-    info = {"headless": False, "executable_path": "/opt/google/chrome/chrome"}
     # allowed_domains = ["example.com"]
     # start_urls = ["https://example.com"]
 
     async def start(self):
+        # zsp.validate(self)  # 自检方式2
 
         yield zsp.Request(
             execution=self.exection,

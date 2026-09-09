@@ -1,13 +1,15 @@
 # from scrapy.http import Response, TextResponse
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Any, Literal, Self
+from functools import wraps
+from typing import Any, Literal, Self, Type
 
 import scrapy
 import scrapy.http
 from playwright.async_api import Page
 from scrapy.crawler import Crawler
 from scrapy.exceptions import NotConfigured
+from scrapy.signals import scheduler_empty
 
 PREFIX = "playwright"
 
@@ -89,22 +91,49 @@ class Request(scrapy.Request):
         self.execution: Exection = execution
 
 
-class Spider(scrapy.Spider):
-    """用以判断是否启用此对应中间件的环境"""
+# class Spider(scrapy.Spider):
+#     """用以判断是否启用此对应中间件的环境"""
 
-    info = {"headless": False, "executable_path": None}
+#     info = {"headless": False, "executable_path": None}
 
-    @classmethod
-    def from_crawler(cls, crawler: Crawler, *args: Any, **kwargs: Any) -> Self:
-        spider = cls(*args, **kwargs)
-        spider._set_crawler(crawler)
+#     @classmethod
+#     def from_crawler(cls, crawler: Crawler, *args: Any, **kwargs: Any) -> Self:
+#         spider = cls(*args, **kwargs)
+#         spider._set_crawler(crawler)
 
-        if X not in spider.settings.getdict("DOWNLOADER_MIDDLEWARES"):
-            raise NotConfigured(
-                f"没有注册 {X}, 则不能启用该中间件及其对应的爬虫类 {type(spider)}。"
-            )
+#         if X not in spider.settings.getdict("DOWNLOADER_MIDDLEWARES"):
+#             raise NotConfigured(
+#                 f"没有注册 {X}, 则不能启用该中间件及其对应的爬虫类 {type(spider)}。"
+#             )
 
-        return spider
+#         return spider
 
-    def __init__(self, name: str | None = None, **kwargs: dict):
-        super().__init__(name, **kwargs)
+#     def __init__(self, name: str | None = None, **kwargs: dict):
+#         super().__init__(name, **kwargs)
+
+
+def validate(spider: scrapy.Spider):
+
+    if X not in spider.settings.getdict("DOWNLOADER_MIDDLEWARES"):
+        raise NotConfigured(
+            f"没有注册 {X}, 则不能启用该中间件及其对应的爬虫类 {type(spider)}。"
+        )
+    else:
+        print("已经注册", X)
+
+
+def enable(config):
+    def _enable(Spider: type[scrapy.Spider]):
+        _start = Spider.start
+
+        @wraps(_start)
+        async def start(self, *args: Any, **kwargs: Any):
+            validate(self)
+            async for x in _start(self, *args, **kwargs):
+                yield x
+
+        Spider.start = start
+        Spider.config = config  # type: ignore
+        return Spider
+
+    return _enable

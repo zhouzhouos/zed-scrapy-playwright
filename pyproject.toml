@@ -1,6 +1,6 @@
 [project]
 name = "zed-scrapy-playwright"
-version = "0.1.1"
+version = "0.2.0"
 description = "Less meta-dict config, more functional coding. Schedule browser pages as easily as CSS selectors."
 readme = "README.md"
 authors = [
