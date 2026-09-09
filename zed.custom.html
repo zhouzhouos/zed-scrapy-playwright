@@ -1,0 +1,16 @@
+<!--基本上很少会有用到这个客制化文件的需要，所以定义结构的时候，怎么舒服怎么来即可 -->
+<main>
+    <playwright>
+        <browser>
+            <context>
+                <page class="static"></page>
+            </context>
+        </browser>
+    </playwright>
+    <script>
+        //这里用于批量脚本
+        $("main context").append(
+            '<page class="dynamic"></page>'.repeat(2),
+        );
+    </script>
+</main>

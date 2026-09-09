@@ -24,6 +24,12 @@ class ExampleExecutor(zsp.Spider):
             callback=self.parse2,
         )
 
+        yield zsp.Request(
+            selector="page.default",
+            execution=self.exection3,
+            callback=self.parse3,
+        )
+
     @staticmethod
     async def exection(ep: zsp.ExecParam):
         await ep.page.goto("https://example.com")
@@ -32,9 +38,20 @@ class ExampleExecutor(zsp.Spider):
     @staticmethod
     async def exection2(ep: zsp.ExecParam):
         await ep.page.goto("https://example.com")
+        # while not ep.page.is_closed():
+        #     await sleep(1)
 
     def parse2(self, response: scrapy.http.HtmlResponse):
         print("parse2:", response.url)
 
     def parse(self, response: zsp.Response):
         print("parse:", response.result)
+
+    @staticmethod
+    async def exection3(ep: zsp.ExecParam):
+        # await sleep(20)
+        pass
+
+    def parse3(self, response: scrapy.http.HtmlResponse):
+        print("parse3:", response.url)
+        print("parse3:", response.css("page").getall())

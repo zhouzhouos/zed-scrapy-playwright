@@ -54,6 +54,7 @@ Exection = Callable[[ExecParam], Awaitable[Any]]
 class Request(scrapy.Request):
     def __init__(
         self,
+        *,
         selector: str | None = None,
         execution: Exection,
         callback,
