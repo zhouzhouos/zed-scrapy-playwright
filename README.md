@@ -1,109 +1,144 @@
-# zed-scrapy-playwright
+# zed-scrapy-playwright (zsp)
 
-> Less meta config, more Python code.
+> Less meta config, more Python code.    把 Scrapy 变成 Playwright 的事件调度引擎。
 
-> 把 Scrapy 变成 Playwright 的事件调度引擎。
-
-[English](docs/README-en.md)
+`zsp` 是一个 Scrapy 与 Playwright 的集成中间件，提供**会话级控制**、**线性编码**和**精准数据传输**，让你在 Scrapy 爬虫中轻松使用 Playwright 的浏览器自动化能力。
 
 ---
 
-## 简介
+## ✨ 核心特性
 
-`zed-scrapy-playwright` 是一个 Scrapy 中间件，它重新定义了 Scrapy 与 Playwright 的集成方式——**让 Scrapy 成为事件调度器，让 Playwright 成为可编程的执行引擎。**
-
-不同于传统方案将每个请求限制为单次页面导航，本中间件允许你在一个 `execution` 中完成完整的业务流程：登录、搜索、详情、下单，一气呵成。
-
----
-
-## 核心特性
-
-- **会话级控制** — 单次 execution 内多次 `goto`，登录态自动保持
-- **线性编码** — 复杂流程写在一个函数里，告别 callback 地狱
-- **精准数据传输** — 在 Page 中直接提取初筛数据，避免传输冗余 HTML
-- **完全开放** — 任意 Playwright API 均可使用，无预定义操作限制
-- **双向交叉检查** — 中间件与爬虫相互验证，配置错误快速失败
-- **Stealth 灵活可控** — 可全局注入，也可在每个 execution 中自定义
-- **类型安全** — 完整的类型提示，IDE 友好
+- **会话级控制**：单次 `execution` 内支持多次 `page.goto()`，保持页面状态
+- **线性编码**：告别 callback 地狱，以同步风格编写异步浏览器操作
+- **精准数据传输**：直接在 Page 对象中提取数据，无需额外的解析步骤
+- **完整的类型提示**：享受 IDE 智能补全和类型检查
+- **装饰器启用模式**（v0.2.0+）：使用 `@zsp.enable()` 装饰器，支持任意爬虫类
+- **内置 Playwright Provider**（v0.2.0+）：管理浏览器生命周期，支持 CSS 选择模式
+- **Stealth 反检测**：自动注入 `playwright-stealth`，降低被识别为机器人的风险
 
 ---
 
-## 快速开始
-
-### 安装
+## 📦 安装
 
 ```bash
 pip install zed-scrapy-playwright
 ```
 
-### 配置 settings.py
+或使用 uv（推荐）：
+
+```bash
+uv add zed-scrapy-playwright
+```
+
+**安装浏览器驱动**（首次使用需要）：
+
+```bash
+playwright install
+```
+
+---
+
+## 🚀 快速开始
+
+### 1. 启用中间件
+
+在 `settings.py` 中添加：
 
 ```python
 DOWNLOADER_MIDDLEWARES = {
-    "zed_scrapy_playwright.handler.PlaywrightDownloaderMiddleware": 300,
+    'zsp.handler.PlaywrightDownloaderMiddleware': 543,
 }
 ```
 
-### 编写爬虫
+### 2. 编写爬虫（使用装饰器模式）
 
 ```python
-import zed_scrapy_playwright as zsp
-from playwright.async_api import Page
+import scrapy
+import zsp
 
-class MySpider(zsp.Spider):
-    name = "example"
+@zsp.enable()
+class MySpider(scrapy.Spider):
+    name = "my_spider"
+    start_urls = ["https://example.com"]
 
-    async def start(self):
+    def start_requests(self):
         yield zsp.Request(
-            exec_type="NewPage",
-            execution=self.search_and_scrape,
+            url="https://example.com",
             callback=self.parse,
-            meta={"keyword": "laptop"},
+            execution=self.execution_func,
         )
 
-    @staticmethod
-    async def search_and_scrape(request: zsp.Request, page: Page):
-        keyword = request.meta["keyword"]
-
-        await page.goto("https://example.com")
-        await page.fill("#search", keyword)
-        await page.click("#search-btn")
-        await page.wait_for_selector(".results")
-
-        # 初筛数据：直接在页面中提取
-        items = await page.evaluate("""
-            Array.from(document.querySelectorAll('.item')).map(el => ({
-                title: el.querySelector('.title')?.innerText,
-                price: el.querySelector('.price')?.innerText,
-            }))
-        """)
-
-        return {"items": items, "keyword": keyword}
+    async def execution_func(self, page, request):
+        await page.goto(request.url)
+        content = await page.content()
+        return {
+            "title": await page.title(),
+            "html": content,
+        }
 
     async def parse(self, response: zsp.Response):
-        data = response.data  # 初筛数据
-        for item in data["items"]:
-            yield {
-                "title": item["title"],
-                "price": float(item["price"].replace("$", "")),
-            }
+        print("parse:", response.result)
+```
+
+### 3. 运行爬虫
+
+```bash
+scrapy crawl my_spider
 ```
 
 ---
 
-## 对比 scrapy-playwright
+## 📖 API 文档
 
-| 维度 | scrapy-playwright | zed-scrapy-playwright |
-|------|:---:|:---:|
-| 操作自由度 | 有限 | 无限 |
-| 多次 goto | ❌ | ✅ |
-| 登录态保持 | 配置复杂 | 天然支持 |
-| 代码组织 | 分散 callback | 线性聚合 |
-| 数据传输 | 完整 HTML | 初筛数据 |
-| 防误用机制 | 无 | 双向交叉检查 |
+### `zsp.enable()`
+装饰器，用于启用爬虫的 Playwright 支持。
+
+```python
+@zsp.enable()
+class MySpider(scrapy.Spider):
+    ...
+```
+
+### `zsp.Request`
+继承自 `scrapy.Request`，增加以下参数：
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `execution` | Callable | 异步执行函数，接收 `(page, request)` |
+| `selector` | str | CSS 选择器（v0.2.0+，配合 Provider 使用） |
+
+### `zsp.execution` 函数签名
+```python
+async def execution_func(page: Page, request: Request) -> dict | None:
+    # 进行浏览器操作...
+    return {"key": value}
+```
+
+- 返回 `None` 时，默认返回 `HtmlResponse`（页面源码）
 
 ---
 
-## 许可证
+## 🤝 贡献
 
-暂定：MIT
+欢迎提交 Issue 和 Pull Request！
+
+1. Fork 本仓库
+2. 创建你的功能分支 (`git checkout -b feature/amazing`)
+3. 提交你的更改 (`git commit -m 'Add some amazing feature'`)
+4. 推送到分支 (`git push origin feature/amazing`)
+5. 打开 Pull Request
+
+---
+
+## 📄 许可证
+
+本项目采用 **Apache License 2.0** 许可证。
+
+版权所有 © 2026 zhouzhouos
+
+---
+
+## 🧩 相关链接
+
+- [Scrapy 官方文档](https://docs.scrapy.org/)
+- [Playwright Python 官方文档](https://playwright.dev/python/)
