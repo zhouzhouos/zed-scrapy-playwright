@@ -1,5 +1,6 @@
 # from scrapy.http import Response, TextResponse
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from typing import Any, Literal, Self
 
 import scrapy
@@ -9,7 +10,6 @@ from scrapy.crawler import Crawler
 from scrapy.exceptions import NotConfigured
 
 PREFIX = "playwright"
-ExecType = Literal["NewPage"]
 
 X = "zed_scrapy_playwright.handler.PlaywrightDownloaderMiddleware"
 
@@ -42,12 +42,21 @@ class Response(scrapy.http.Response):
         self.result: Any = result
 
 
+@dataclass
+class ExecParam:
+    request: "Request"
+    page: Page
+
+
+Exection = Callable[[ExecParam], Awaitable[Any]]
+
+
 class Request(scrapy.Request):
     def __init__(
         self,
-        exec_type: ExecType = "NewPage",
-        execution: Callable[["Request", Page], Awaitable[Any]] | None = None,
-        callback=None,
+        selector: str | None = None,
+        execution: Exection,
+        callback,
         # method="GET",
         # headers=None,
         # body=None,
@@ -61,7 +70,7 @@ class Request(scrapy.Request):
         # cb_kwargs=None,
     ):
         super().__init__(
-            url=f"{PREFIX}://{exec_type}",
+            url=f"{PREFIX}://request",
             callback=callback,
             # method,
             # headers,
@@ -75,12 +84,8 @@ class Request(scrapy.Request):
             # flags,
             # cb_kwargs,
         )
-        self.exec_type: ExecType = exec_type
-        self.execution = execution if execution else self._default_execution
-
-    @staticmethod
-    async def _default_execution(request: "Request", page: Page):
-        print("Warning")
+        self.selector = selector
+        self.execution: Exection = execution
 
 
 class Spider(scrapy.Spider):

@@ -1,15 +1,17 @@
 [project]
 name = "zed-scrapy-playwright"
 version = "0.1.0"
-description = "Add your description here"
+description = "Less meta-dict config, more functional coding. Schedule browser pages as easily as CSS selectors."
 readme = "README.md"
 authors = [
     { name = "zhouzhouos", email = "leisure-zyf@qq.com" }
 ]
 requires-python = ">=3.12"
 dependencies = [
+    "icecream>=2.2.0",
     "playwright>=1.62.0",
     "playwright-stealth>=2.0.3",
+    "pytest>=9.1.1",
     "scrapy>=2.18.0",
 ]
 

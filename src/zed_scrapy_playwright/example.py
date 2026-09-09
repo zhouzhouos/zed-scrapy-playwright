@@ -1,3 +1,5 @@
+from asyncio import sleep
+
 import scrapy.http
 from playwright.async_api import Page
 
@@ -23,13 +25,13 @@ class ExampleExecutor(zsp.Spider):
         )
 
     @staticmethod
-    async def exection(request: zsp.Request, page: Page):
-        await page.goto("https://example.com")
-        return {"info": "any"}
+    async def exection(ep: zsp.ExecParam):
+        await ep.page.goto("https://example.com")
+        return {"info": "information"}
 
     @staticmethod
-    async def exection2(request: zsp.Request, page: Page):
-        await page.goto("https://example.com")
+    async def exection2(ep: zsp.ExecParam):
+        await ep.page.goto("https://example.com")
 
     def parse2(self, response: scrapy.http.HtmlResponse):
         print("parse2:", response.url)

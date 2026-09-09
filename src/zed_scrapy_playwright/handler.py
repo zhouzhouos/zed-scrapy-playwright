@@ -11,8 +11,10 @@ import scrapy.http
 from playwright.async_api import async_playwright
 from playwright_stealth import Stealth
 from scrapy import Request, crawler, signals
+from scrapy.exceptions import IgnoreRequest
 
 from . import definition as Zed
+from . import provider
 
 
 class PlaywrightDownloaderMiddleware:
@@ -46,41 +48,38 @@ class PlaywrightDownloaderMiddleware:
         if isinstance(request, Zed.Request):
             print("主动发起", request.url, request.meta)
 
-            match request.exec_type:
-                case "NewPage":
-                    page = await self.context.new_page()
+            page = await self.provider.css(request.selector)
 
-                    if request.meta.get("no-stealth"):
-                        pass
-                    else:
-                        print("已为 new page 自动施加 Stealth.apply_stealth_async")
-                        await Stealth().apply_stealth_async(page)
+            if page is None:
+                raise IgnoreRequest(f"{request.selector} 没有对象")
 
-                    ret = await request.execution(request, page)
-                    if ret is None:
-                        response = scrapy.http.HtmlResponse(
-                            url=page.url,
-                            status=200,
-                            headers=None,
-                            body=b"",
-                            flags=None,
-                            request=None,
-                            certificate=None,
-                            ip_address=None,
-                            protocol=None,
-                        )
-                        response._encoding = 'utf-8'
-                        response._set_body(await page.content())
-                        return response
-                    else:
-                        return Zed.Response(ret, request=request)
+            if request.meta.get("no-stealth") is None:
+                print("已为 new page 自动施加 Stealth.apply_stealth_async")
+                await Stealth().apply_stealth_async(page)
 
-                case _:
-                    pass
+            ret = await request.execution(Zed.ExecParam(request, page))
+
+            if ret is None:
+                response = scrapy.http.HtmlResponse(
+                    url=page.url,
+                    # status=200,
+                    # headers=None,
+                    # body=b"",
+                    # flags=None,
+                    request=request,
+                    # certificate=None,
+                    # ip_address=None,
+                    # protocol=None,
+                )
+                response._encoding = "utf-8"
+                response._set_body(await page.content())
+                return response
+
+            return Zed.Response(ret, request=request)
 
         # 这里处理自动发起的 scrapy.Request 类型，比如 <class 'scrapy.http.request.Request'> wpwp://nothing/robots.txt
         if request.url.startswith(Zed.PREFIX):
-            print("自动请求", request.url, '已拦截')
+            print("自动请求", request.url, "已拦截")
             return Zed.Response("", request=request)
 
         # 其他的寻常的 request 不在这里截留，让其 continue
@@ -108,25 +107,16 @@ class PlaywrightDownloaderMiddleware:
         self.c: crawler.Crawler
         if not isinstance(self.c.spider, Zed.Spider):
             print(
-                "Warning:",
-                f"该爬虫类没有继承于 {type(self)}，将不会进行此中间件环境的启用",
+                f"Warning: 该爬虫类没有继承于 {type(self)}，将不会进行此中间件环境的启用",
             )
             return
 
-        print("spider_opened, start the initialization of async playwright api object.")
-        self.pm = async_playwright()
-        self.pr = await self.pm.start()
-        self.browser = await self.pr.chromium.launch(**self.c.spider.info)
-        self.context = await self.browser.new_context(no_viewport=True)
+        print("spider_opened, start the initialization of async playwright")
+        self.provider = await provider.Provider().init(self.c.spider.info)
 
     async def spider_closed(self):
         if not isinstance(self.c.spider, Zed.Spider):
             return
 
-        print(
-            "spider_closed, start the finalizing work of async playwright api object."
-        )
-        await self.context.close()
-        await self.browser.close()
-        await self.pr.stop()
-        await self.pm.__aexit__()
+        print("spider_closed, start the finalizing work of async playwright")
+        await self.provider.close()
