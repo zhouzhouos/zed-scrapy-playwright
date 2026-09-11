@@ -9,21 +9,19 @@ import scrapy
 import scrapy.http
 from playwright.async_api import Page
 
+from zed_scrapy_playwright import constants as C
+from zed_scrapy_playwright.interface import ConfigDict
+
 # from scrapy.crawler import Crawler
 # from scrapy.exceptions import NotConfigured
 # from scrapy.signals import scheduler_empty
-from . import constants
-
-PREFIX = "playwright"
-
-X = "zed_scrapy_playwright.handler.PlaywrightDownloaderMiddleware"
 
 
 class Response(scrapy.http.Response):
     def __init__(
         self,
         result,
-        url=f"{PREFIX}://response",
+        url=f"{C.REQUEST_PREFIX}://response",
         status=200,
         headers=None,
         body=b"",
@@ -76,7 +74,7 @@ class Request(scrapy.Request):
         # cb_kwargs=None,
     ):
         super().__init__(
-            url=f"{PREFIX}://request",
+            url=f"{C.REQUEST_PREFIX}://request",
             callback=callback,
             # method,
             # headers,
@@ -116,8 +114,8 @@ class Request(scrapy.Request):
 
 
 def validate(spider: scrapy.Spider):
-    logger = logging.getLogger(constants.PACKAGE_NAME)
-
+    logger = logging.getLogger(C.PACKAGE_NAME)
+    X = C.MIDDLEWARE_NAME
     if X not in spider.settings.getdict("DOWNLOADER_MIDDLEWARES"):
         s = f"没有注册 {X}, 则不能启用该中间件及其对应的爬虫类 {type(spider)}。"
         logger.warning(s)
@@ -127,7 +125,7 @@ def validate(spider: scrapy.Spider):
         return True
 
 
-def enable(config):
+def enable(config: ConfigDict):
     def _enable(Spider: type[scrapy.Spider]):
         _start = Spider.start
 

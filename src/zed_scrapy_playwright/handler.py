@@ -9,6 +9,7 @@
 
 import importlib.util
 import logging
+from typing import cast
 
 import scrapy.http
 from playwright.async_api import async_playwright
@@ -18,8 +19,8 @@ from scrapy.exceptions import IgnoreRequest
 from scrapy.utils.log import SpiderLoggerAdapter
 
 from zed_scrapy_playwright import constants
-
-from . import definition as Zed
+from zed_scrapy_playwright import definition as Zed
+from zed_scrapy_playwright import interface as I
 
 HAS_SCHEDULE_MODULE = importlib.util.find_spec("zed_sp_schedule") is not None
 HAS_TRANSLATE_MODULE = importlib.util.find_spec("zed_sp_translate") is not None
@@ -33,7 +34,7 @@ if HAS_TRANSLATE_MODULE:
 # HAS_TRANSLATE_MODULE = False
 
 
-class Provider:
+class Provider(I.Provider):
     """处理 Playwright 对象的调用"""
 
     def __init__(self) -> None:
@@ -43,10 +44,22 @@ class Provider:
         # 1. 创建基础容器
         self.playwright_context_manager = async_playwright()
         self.playwright = await self.playwright_context_manager.start()
-        self.default_browser = await self.playwright.chromium.launch(**info)
-        self.default_context = await self.default_browser.new_context(no_viewport=True)
 
-        return self
+        if info is None:
+            self.default_browser = await self.playwright.chromium.launch()
+            self.default_context = await self.default_browser.new_context()
+            return self
+
+        if info["browser_type"] == "chrome":
+            self.default_browser = await self.playwright.chromium.launch(
+                **info["chrome_params"]
+            )
+            self.default_context = await self.default_browser.new_context(
+                no_viewport=True
+            )
+            return self
+        else:
+            raise NotImplementedError
 
     async def close(self):
         await self.default_browser.close()
@@ -121,7 +134,7 @@ class PlaywrightDownloaderMiddleware:
                 return Zed.Response(ret, request=request)
 
         # 这里处理自动发起的 scrapy.Request 类型，比如 <class 'scrapy.http.request.Request'> wpwp://nothing/robots.txt
-        if request.url.startswith(Zed.PREFIX):
+        if request.url.startswith(Zed.C.REQUEST_PREFIX):
             self.logger.info(f"自动请求 {request.url} 已被拦截")
             return Zed.Response("", request=request)
 
@@ -170,9 +183,8 @@ class PlaywrightDownloaderMiddleware:
                 getattr(self.c.spider, "config", None)
             )
         else:
-            self.provider = await Provider().start(
-                getattr(self.c.spider, "config", None)
-            )
+            info = cast(I.ConfigDict | None, getattr(self.c.spider, "config", None))
+            self.provider = await Provider().start(info)
 
         if HAS_TRANSLATE_MODULE:
             ...

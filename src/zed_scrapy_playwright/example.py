@@ -6,7 +6,15 @@ import zed_scrapy_playwright as zsp
 
 
 # 配置并自检
-@zsp.enable({"headless": False, "executable_path": "/opt/google/chrome/chrome"})
+@zsp.enable(
+    {
+        "browser_type": "chrome",
+        "chrome_params": {
+            "headless": False,
+            "executable_path": "/opt/google/chrome/chrome",
+        },
+    }
+)
 class ExampleExecutor(scrapy.Spider):
     name = "example"
     # allowed_domains = ["example.com"]
