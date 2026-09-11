@@ -6,7 +6,7 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Literal, Self, TypedDict
 
-from playwright.async_api import Page, ProxySettings
+from playwright.async_api import Page, ProxySettings, async_playwright
 
 
 class ChromeBrowserLaunchParameters(TypedDict, total=False):
@@ -37,11 +37,40 @@ class ConfigDict(TypedDict):
 class Provider(ABC):
     """处理 Playwright 对象的调用"""
 
-    @abstractmethod
-    async def start(self, info: ConfigDict | None) -> Self: ...
+    def __init__(self, info: ConfigDict | None) -> None:
+        super().__init__()
+        if info:
+            self.config = info
 
     @abstractmethod
-    async def close(self) -> None: ...
+    async def start(self) -> Self:
+        """Start"""
 
     @abstractmethod
-    async def css(self, selector: str | None) -> Page | None: ...
+    async def close(self) -> None:
+        """Close"""
+
+    @abstractmethod
+    async def css(self, selector: str | None) -> Page | None:
+        """Choose"""
+
+
+class DefaultProvider(Provider):
+    """moren"""
+
+    async def start(self):
+        self.playwright_context_manager = async_playwright()
+        self.playwright = await self.playwright_context_manager.start()
+        self.default_browser = await self.playwright.chromium.launch()
+        self.default_context = await self.default_browser.new_context()
+        return self
+
+    async def close(self):
+        await self.default_context.close()
+        await self.default_browser.close()
+        await self.playwright.stop()
+        await self.playwright_context_manager.__aexit__()
+
+    async def css(self, selector) -> Page | None:
+        """Choose"""
+        return await self.default_context.new_page()

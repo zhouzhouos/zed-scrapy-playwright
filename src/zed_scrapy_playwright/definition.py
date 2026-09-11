@@ -125,7 +125,7 @@ def validate(spider: scrapy.Spider):
         return True
 
 
-def enable(config: ConfigDict):
+def enable(config: ConfigDict | None = None):
     def _enable(Spider: type[scrapy.Spider]):
         _start = Spider.start
 

@@ -37,22 +37,14 @@ if HAS_TRANSLATE_MODULE:
 class Provider(I.Provider):
     """处理 Playwright 对象的调用"""
 
-    def __init__(self) -> None:
-        pass
+    async def start(self):
 
-    async def start(self, info):
-        # 1. 创建基础容器
         self.playwright_context_manager = async_playwright()
         self.playwright = await self.playwright_context_manager.start()
 
-        if info is None:
-            self.default_browser = await self.playwright.chromium.launch()
-            self.default_context = await self.default_browser.new_context()
-            return self
-
-        if info["browser_type"] == "chrome":
+        if self.config["browser_type"] == "chrome":
             self.default_browser = await self.playwright.chromium.launch(
-                **info["chrome_params"]
+                **self.config["chrome_params"]
             )
             self.default_context = await self.default_browser.new_context(
                 no_viewport=True
@@ -178,13 +170,20 @@ class PlaywrightDownloaderMiddleware:
             return
 
         self.logger.info("spider_opened, start the initialization of async playwright")
-        if HAS_SCHEDULE_MODULE:
-            self.provider = await zed_sp_schedule.Provider().init(  # noqa: F821
-                getattr(self.c.spider, "config", None)
-            )
+
+        CustomProvider = (
+            Provider if not HAS_SCHEDULE_MODULE else zed_sp_schedule.Provider
+        )
+        # CustomProvider = Provider
+        # CustomProvider = zed_sp_schedule.Provider
+
+        if config_dictionary := getattr(self.c.spider, "config", None):
+            info = cast(I.ConfigDict, config_dictionary)
+            self.provider = await CustomProvider(info).start()
         else:
-            info = cast(I.ConfigDict | None, getattr(self.c.spider, "config", None))
-            self.provider = await Provider().start(info)
+            self.provider = await I.DefaultProvider(None).start()
+
+        self.logger.warning(f"{type(self.provider)}")
 
         if HAS_TRANSLATE_MODULE:
             ...
