@@ -1,15 +1,18 @@
 # from scrapy.http import Response, TextResponse
+import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from functools import wraps
-from typing import Any, Literal, Self, Type
 
+# from typing import Any, Literal, Self, Type
 import scrapy
 import scrapy.http
 from playwright.async_api import Page
-from scrapy.crawler import Crawler
-from scrapy.exceptions import NotConfigured
-from scrapy.signals import scheduler_empty
+
+# from scrapy.crawler import Crawler
+# from scrapy.exceptions import NotConfigured
+# from scrapy.signals import scheduler_empty
+from . import constants
 
 PREFIX = "playwright"
 
@@ -41,7 +44,7 @@ class Response(scrapy.http.Response):
             ip_address,
             protocol,
         )
-        self.result: Any = result
+        self.result = result
 
 
 @dataclass
@@ -50,7 +53,7 @@ class ExecParam:
     page: Page
 
 
-Exection = Callable[[ExecParam], Awaitable[Any]]
+Exection = Callable[[ExecParam], Awaitable]
 
 
 class Request(scrapy.Request):
@@ -113,13 +116,15 @@ class Request(scrapy.Request):
 
 
 def validate(spider: scrapy.Spider):
+    logger = logging.getLogger(constants.PACKAGE_NAME)
 
     if X not in spider.settings.getdict("DOWNLOADER_MIDDLEWARES"):
-        raise NotConfigured(
-            f"没有注册 {X}, 则不能启用该中间件及其对应的爬虫类 {type(spider)}。"
-        )
+        s = f"没有注册 {X}, 则不能启用该中间件及其对应的爬虫类 {type(spider)}。"
+        logger.warning(s)
+        return False
     else:
-        print("已经注册", X)
+        logger.info(f"已经注册 {X}")
+        return True
 
 
 def enable(config):
@@ -127,7 +132,7 @@ def enable(config):
         _start = Spider.start
 
         @wraps(_start)
-        async def start(self, *args: Any, **kwargs: Any):
+        async def start(self, *args, **kwargs):
             validate(self)
             async for x in _start(self, *args, **kwargs):
                 yield x

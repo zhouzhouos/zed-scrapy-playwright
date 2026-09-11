@@ -1,7 +1,6 @@
-from asyncio import sleep
+# from asyncio import sleep
 
 import scrapy.http
-from playwright.async_api import Page
 
 import zed_scrapy_playwright as zsp
 
@@ -14,7 +13,7 @@ class ExampleExecutor(scrapy.Spider):
     # start_urls = ["https://example.com"]
 
     async def start(self):
-        # zsp.validate(self)  # 自检方式2
+        self.logger.info(f"自检结果 {zsp.validate(self)}")
 
         yield zsp.Request(
             execution=self.exection,
@@ -44,10 +43,10 @@ class ExampleExecutor(scrapy.Spider):
         #     await sleep(1)
 
     def parse2(self, response: scrapy.http.HtmlResponse):
-        print("parse2:", response.url)
+        print(f"parse2: {response.url}")
 
     def parse(self, response: zsp.Response):
-        print("parse:", response.result)
+        print(f"parse1: {response.result}")
 
     @staticmethod
     async def exection3(ep: zsp.ExecParam):
@@ -55,5 +54,5 @@ class ExampleExecutor(scrapy.Spider):
         pass
 
     def parse3(self, response: scrapy.http.HtmlResponse):
-        print("parse3:", response.url)
-        print("parse3:", response.css("page").getall())
+        print(f"parse3: {response.url}")
+        print(f"parse3: pages: {response.css('page').getall()}")

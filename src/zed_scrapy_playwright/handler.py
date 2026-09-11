@@ -7,14 +7,54 @@
 # from itemadapter import ItemAdapter
 
 
+import importlib.util
+import logging
+
 import scrapy.http
 from playwright.async_api import async_playwright
 from playwright_stealth import Stealth
 from scrapy import Request, crawler, signals
 from scrapy.exceptions import IgnoreRequest
+from scrapy.utils.log import SpiderLoggerAdapter
+
+from zed_scrapy_playwright import constants
 
 from . import definition as Zed
-from . import provider
+
+HAS_SCHEDULE_MODULE = importlib.util.find_spec("zed_sp_schedule") is not None
+HAS_TRANSLATE_MODULE = importlib.util.find_spec("zed_sp_translate") is not None
+
+if HAS_SCHEDULE_MODULE:
+    import zed_sp_schedule
+if HAS_TRANSLATE_MODULE:
+    import zed_sp_translate
+
+# HAS_SCHEDULE_MODULE = False
+# HAS_TRANSLATE_MODULE = False
+
+
+class Provider:
+    """处理 Playwright 对象的调用"""
+
+    def __init__(self) -> None:
+        pass
+
+    async def start(self, info):
+        # 1. 创建基础容器
+        self.playwright_context_manager = async_playwright()
+        self.playwright = await self.playwright_context_manager.start()
+        self.default_browser = await self.playwright.chromium.launch(**info)
+        self.default_context = await self.default_browser.new_context(no_viewport=True)
+
+        return self
+
+    async def close(self):
+        await self.default_browser.close()
+        await self.playwright.stop()
+        await self.playwright_context_manager.__aexit__()
+
+    async def css(self, selector: str | None):
+        return await self.default_context.new_page()
 
 
 class PlaywrightDownloaderMiddleware:
@@ -46,16 +86,19 @@ class PlaywrightDownloaderMiddleware:
 
         # 这里处理主动发起的自定义的 request 类型
         if isinstance(request, Zed.Request):
-            print("主动发起", request.url, request.meta)
+            self.logger.info(f"主动请求 {request.url} with {request.meta}")
 
-            page = await self.provider.css(request.selector)
-
-            if page is None:
-                raise IgnoreRequest(f"{request.selector} 没有对象")
-
-            if request.meta.get("no-stealth") is None:
-                print("已为 new page 自动施加 Stealth.apply_stealth_async")
-                await Stealth().apply_stealth_async(page)
+            if HAS_SCHEDULE_MODULE:
+                page = await self.provider.css(request.selector)
+                if page is None:
+                    raise IgnoreRequest(f"{request.selector} 没有对象")
+                if request.meta.get("no-stealth") is None:
+                    self.logger.info(
+                        "已自动为 new page 施加 Stealth.apply_stealth_async"
+                    )
+                    await Stealth().apply_stealth_async(page)
+            else:
+                page = await self.provider.css(request.selector)
 
             ret = await request.execution(Zed.ExecParam(request, page))
 
@@ -74,13 +117,17 @@ class PlaywrightDownloaderMiddleware:
                 response._encoding = "utf-8"
                 response._set_body(await page.content())
                 return response
-
-            return Zed.Response(ret, request=request)
+            else:
+                return Zed.Response(ret, request=request)
 
         # 这里处理自动发起的 scrapy.Request 类型，比如 <class 'scrapy.http.request.Request'> wpwp://nothing/robots.txt
         if request.url.startswith(Zed.PREFIX):
-            print("自动请求", request.url, "已拦截")
+            self.logger.info(f"自动请求 {request.url} 已被拦截")
             return Zed.Response("", request=request)
+
+        # 当请求不是zsp的request类时，考虑兼容性
+        if self.has_validate_spider:
+            ...
 
         # 其他的寻常的 request 不在这里截留，让其 continue
 
@@ -114,16 +161,34 @@ class PlaywrightDownloaderMiddleware:
         #         f"Warning: 该爬虫类没有继承于 {type(self)}，将不会进行此中间件环境的启用",
         #     )
         #     return
-        if self.has_validate_spider:
-            print("spider_opened, start the initialization of async playwright")
-            self.provider = await provider.Provider().init(
+        if not self.has_validate_spider:
+            return
+
+        self.logger.info("spider_opened, start the initialization of async playwright")
+        if HAS_SCHEDULE_MODULE:
+            self.provider = await zed_sp_schedule.Provider().init(  # noqa: F821
                 getattr(self.c.spider, "config", None)
             )
+        else:
+            self.provider = await Provider().start(
+                getattr(self.c.spider, "config", None)
+            )
+
+        if HAS_TRANSLATE_MODULE:
+            ...
+
+    @property
+    def logger(self) -> SpiderLoggerAdapter:
+        # name = self.c.spider.name if self.c.spider else "ZSP"
+        logger = logging.getLogger(constants.PACKAGE_NAME)
+        return SpiderLoggerAdapter(logger, {"zed-sp-middleware": self})
 
     async def spider_closed(self):
         # if not isinstance(self.c.spider, Zed.Spider):
         #     return
 
         if self.has_validate_spider:
-            print("spider_closed, start the finalizing work of async playwright")
+            self.logger.info(
+                "spider_closed, start the finalizing work of async playwright"
+            )
             await self.provider.close()
