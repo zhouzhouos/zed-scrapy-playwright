@@ -1,12 +1,22 @@
-"""此处不导入其他本模组库，避免回环"""
+"""此处尽可能不实际导入其他本模组库，避免回环"""
+
+# 加上它后，注解变成字符串,之后所有注解不再求值，而是原样保存为字符串
+from __future__ import annotations  # 避免在注释上产生循环导入
 
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from datetime import timedelta
 from pathlib import Path
-from typing import Literal, Self, TypedDict
+from typing import TYPE_CHECKING, Literal, Self, TypedDict
 
+# from scrapy import Request
+import scrapy.http
 from playwright.async_api import Page, ProxySettings, async_playwright
+
+# from scrapy.http.response import
+
+if TYPE_CHECKING:
+    from zed_scrapy_playwright import definition as Z
 
 
 class ChromeBrowserLaunchParameters(TypedDict, total=False):
@@ -54,23 +64,8 @@ class Provider(ABC):
     async def css(self, selector: str | None) -> Page | None:
         """Choose"""
 
-
-class DefaultProvider(Provider):
-    """moren"""
-
-    async def start(self):
-        self.playwright_context_manager = async_playwright()
-        self.playwright = await self.playwright_context_manager.start()
-        self.default_browser = await self.playwright.chromium.launch()
-        self.default_context = await self.default_browser.new_context()
-        return self
-
-    async def close(self):
-        await self.default_context.close()
-        await self.default_browser.close()
-        await self.playwright.stop()
-        await self.playwright_context_manager.__aexit__()
-
-    async def css(self, selector) -> Page | None:
-        """Choose"""
-        return await self.default_context.new_page()
+    @abstractmethod
+    async def takeover(
+        self, request: Z.Request
+    ) -> Z.Response | scrapy.http.HtmlResponse:
+        """Takeover"""

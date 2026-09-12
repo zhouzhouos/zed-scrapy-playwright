@@ -19,47 +19,20 @@ from scrapy.exceptions import IgnoreRequest
 from scrapy.utils.log import SpiderLoggerAdapter
 
 from zed_scrapy_playwright import constants
-from zed_scrapy_playwright import definition as Zed
+from zed_scrapy_playwright import definition as Z
 from zed_scrapy_playwright import interface as I
+from zed_scrapy_playwright.provider import DefaultProvider
 
-HAS_SCHEDULE_MODULE = importlib.util.find_spec("zed_sp_schedule") is not None
-HAS_TRANSLATE_MODULE = importlib.util.find_spec("zed_sp_translate") is not None
+# HAS_SCHEDULE_MODULE = importlib.util.find_spec("zed_sp_schedule") is not None
+# HAS_TRANSLATE_MODULE = importlib.util.find_spec("zed_sp_translate") is not None
 
-if HAS_SCHEDULE_MODULE:
-    import zed_sp_schedule
-if HAS_TRANSLATE_MODULE:
-    import zed_sp_translate
+# if HAS_SCHEDULE_MODULE:
+#     import zed_sp_schedule
+# if HAS_TRANSLATE_MODULE:
+#     import zed_sp_translate
 
-# HAS_SCHEDULE_MODULE = False
-# HAS_TRANSLATE_MODULE = False
-
-
-class Provider(I.Provider):
-    """处理 Playwright 对象的调用"""
-
-    async def start(self):
-
-        self.playwright_context_manager = async_playwright()
-        self.playwright = await self.playwright_context_manager.start()
-
-        if self.config["browser_type"] == "chrome":
-            self.default_browser = await self.playwright.chromium.launch(
-                **self.config["chrome_params"]
-            )
-            self.default_context = await self.default_browser.new_context(
-                no_viewport=True
-            )
-            return self
-        else:
-            raise NotImplementedError
-
-    async def close(self):
-        await self.default_browser.close()
-        await self.playwright.stop()
-        await self.playwright_context_manager.__aexit__()
-
-    async def css(self, selector: str | None):
-        return await self.default_context.new_page()
+HAS_SCHEDULE_MODULE = False
+HAS_TRANSLATE_MODULE = False
 
 
 class PlaywrightDownloaderMiddleware:
@@ -90,45 +63,15 @@ class PlaywrightDownloaderMiddleware:
         #   installed downloader middleware will be called
 
         # 这里处理主动发起的自定义的 request 类型
-        if isinstance(request, Zed.Request):
+        if isinstance(request, Z.Request):
             self.logger.info(f"主动请求 {request.url} with {request.meta}")
-
-            if HAS_SCHEDULE_MODULE:
-                page = await self.provider.css(request.selector)
-                if page is None:
-                    raise IgnoreRequest(f"{request.selector} 没有对象")
-                if request.meta.get("no-stealth") is None:
-                    self.logger.info(
-                        "已自动为 new page 施加 Stealth.apply_stealth_async"
-                    )
-                    await Stealth().apply_stealth_async(page)
-            else:
-                page = await self.provider.css(request.selector)
-
-            ret = await request.execution(Zed.ExecParam(request, page))
-
-            if ret is None:
-                response = scrapy.http.HtmlResponse(
-                    url=page.url,
-                    # status=200,
-                    # headers=None,
-                    # body=b"",
-                    # flags=None,
-                    request=request,
-                    # certificate=None,
-                    # ip_address=None,
-                    # protocol=None,
-                )
-                response._encoding = "utf-8"
-                response._set_body(await page.content())
-                return response
-            else:
-                return Zed.Response(ret, request=request)
+            response = await self.provider.takeover(request)
+            return response
 
         # 这里处理自动发起的 scrapy.Request 类型，比如 <class 'scrapy.http.request.Request'> wpwp://nothing/robots.txt
-        if request.url.startswith(Zed.C.REQUEST_PREFIX):
+        if request.url.startswith(Z.C.REQUEST_PREFIX):
             self.logger.info(f"自动请求 {request.url} 已被拦截")
-            return Zed.Response("", request=request)
+            return Z.Response("", request=request)
 
         # 当请求不是zsp的request类时，考虑兼容性
         if self.has_validate_spider:
@@ -159,6 +102,14 @@ class PlaywrightDownloaderMiddleware:
     def has_validate_spider(self):
         return hasattr(self.c.spider, "config")
 
+    # @property
+    # def provider(self):
+    #     return self._provider
+
+    # @provider.setter
+    # def provider(self, x: I.Provider):
+    #     self._provider = x
+
     async def spider_opened(self, spider=None):
         self.c: crawler.Crawler
         # if not isinstance(self.c.spider, Zed.Spider):
@@ -171,20 +122,20 @@ class PlaywrightDownloaderMiddleware:
 
         self.logger.info("spider_opened, start the initialization of async playwright")
 
+        # create the resource provider
         CustomProvider = (
-            Provider if not HAS_SCHEDULE_MODULE else zed_sp_schedule.Provider
+            DefaultProvider if not HAS_SCHEDULE_MODULE else zed_sp_schedule.Provider
         )
-        # CustomProvider = Provider
-        # CustomProvider = zed_sp_schedule.Provider
 
         if config_dictionary := getattr(self.c.spider, "config", None):
             info = cast(I.ConfigDict, config_dictionary)
             self.provider = await CustomProvider(info).start()
         else:
-            self.provider = await I.DefaultProvider(None).start()
+            self.provider = await DefaultProvider(None).start()
 
         self.logger.warning(f"{type(self.provider)}")
 
+        # create the method translator
         if HAS_TRANSLATE_MODULE:
             ...
 
