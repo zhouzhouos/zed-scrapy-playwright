@@ -49,11 +49,8 @@ class Provider(I.Provider):
         await self.playwright.stop()
         await self.playwright_context_manager.__aexit__()
 
-    async def css(self, selector) -> Page:
-        return await self.default_context.new_page()
-
-    async def takeover(self, request: Z.Request):
-        page = await self.css(request.selector)
+    async def takeover(self, request: Z.ZedRequest):
+        page = await self.default_context.new_page()
         ret = await request.execution(Z.ExecParam(request, page))
 
         if ret is None:
@@ -72,4 +69,4 @@ class Provider(I.Provider):
             response._set_body(await page.content())
             return response
         else:
-            return Z.Response(ret, request=request)
+            return Z.ZedResponse(ret, request=request)

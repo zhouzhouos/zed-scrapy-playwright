@@ -16,7 +16,7 @@ from zed_scrapy_playwright import constants as C
 # from scrapy.signals import scheduler_empty
 
 
-class Response(scrapy.http.Response):
+class ZedResponse(scrapy.http.Response):
     def __init__(
         self,
         result,
@@ -46,14 +46,14 @@ class Response(scrapy.http.Response):
 
 @dataclass
 class ExecParam:
-    request: "Request"
+    request: "ZedRequest"
     page: Page
 
 
 Exection = Callable[[ExecParam], Awaitable]
 
 
-class Request(scrapy.Request):
+class ZedRequest(scrapy.Request):
     def __init__(
         self,
         *,
@@ -89,6 +89,7 @@ class Request(scrapy.Request):
         )
         self.selector = selector
         self.execution: Exection = execution
+        self.is_waiting: bool | None = None
 
 
 # class Spider(scrapy.Spider):

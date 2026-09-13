@@ -1,10 +1,10 @@
-from .definition import ExecParam, Request, Response
+from .definition import ExecParam, ZedRequest, ZedResponse
 from .functions import enable, validate
 
 __all__ = [
     "ExecParam",
-    "Request",
-    "Response",
+    "ZedRequest",
+    "ZedResponse",
     "enable",
     "validate",
 ]

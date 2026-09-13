@@ -23,17 +23,17 @@ class ExampleExecutor(scrapy.Spider):
     async def start(self):
         self.logger.info(f"自检结果 {zsp.validate(self)}")
 
-        yield zsp.Request(
+        yield zsp.ZedRequest(
             execution=self.exection,
             callback=self.parse,
         )
 
-        yield zsp.Request(
+        yield zsp.ZedRequest(
             execution=self.exection2,
             callback=self.parse2,
         )
 
-        yield zsp.Request(
+        yield zsp.ZedRequest(
             selector="page.default",
             execution=self.exection3,
             callback=self.parse3,
@@ -53,7 +53,7 @@ class ExampleExecutor(scrapy.Spider):
     def parse2(self, response: scrapy.http.HtmlResponse):
         print(f"parse2: {response.url}")
 
-    def parse(self, response: zsp.Response):
+    def parse(self, response: zsp.ZedResponse):
         print(f"parse1: {response.result}")
 
     @staticmethod

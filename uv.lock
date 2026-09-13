@@ -1032,7 +1032,7 @@ wheels = [
 
 [[package]]
 name = "zed-scrapy-playwright"
-version = "0.3.0a1"
+version = "0.3.1.dev0"
 source = { editable = "." }
 dependencies = [
     { name = "icecream" },

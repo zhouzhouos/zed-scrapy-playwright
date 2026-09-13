@@ -93,7 +93,7 @@ class PlaywrightDownloaderMiddleware:
         #   installed downloader middleware will be called
 
         # 这里处理主动发起的自定义的 request 类型
-        if isinstance(request, Z.Request):
+        if isinstance(request, Z.ZedRequest):
             self.logger.info(f"主动请求 {request.url} with {request.meta}")
             response = await self.provider.takeover(request)
             return response
@@ -101,7 +101,7 @@ class PlaywrightDownloaderMiddleware:
         # 这里处理自动发起的 scrapy.Request 类型，比如 <class 'scrapy.http.request.Request'> wpwp://nothing/robots.txt
         if request.url.startswith(Z.C.REQUEST_PREFIX):
             self.logger.info(f"自动请求 {request.url} 已被拦截")
-            return Z.Response("", request=request)
+            return Z.ZedResponse("", request=request)
 
         # 当请求不是zsp的request类时，考虑兼容性
         if self.has_validate_spider:
@@ -157,7 +157,7 @@ class PlaywrightDownloaderMiddleware:
         if config_dictionary:
             info = cast(I.ConfigDict, config_dictionary)
             if HAS_SCHEDULE_MODULE:
-                self.provider = await zed_sp_schedule.Provider(info).start()
+                self.provider = await zed_sp_schedule.Scheduler(info).start()
             else:
                 self.provider = await default.Provider(info).start()
         else:

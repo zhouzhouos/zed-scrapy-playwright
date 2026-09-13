@@ -60,11 +60,7 @@ class Provider(ABC):
         """Close"""
 
     @abstractmethod
-    async def css(self, selector: str | None) -> Page | None:
-        """Choose"""
-
-    @abstractmethod
     async def takeover(
-        self, request: Z.Request
-    ) -> Z.Response | scrapy.http.HtmlResponse:
+        self, request: Z.ZedRequest
+    ) -> Z.ZedResponse | scrapy.http.HtmlResponse:
         """Takeover"""
