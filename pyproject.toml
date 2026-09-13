@@ -1,6 +1,6 @@
 [project]
 name = "zed-scrapy-playwright"
-version = "0.2.1"
+version = "0.3.0a1"
 description = "Less meta-dict config, more functional coding. Schedule browser pages as easily as CSS selectors."
 readme = "README.md"
 license = "Apache-2.0"
@@ -17,9 +17,27 @@ dependencies = [
     "scrapy>=2.18.0",
 ]
 
+[project.optional-dependencies]
+all = ['zed-sp-schedule','zed-sp-translate']
+schedule = ['zed-sp-schedule']
+translate = ['zed-sp-translate']
+
 [project.scripts]
 zed-scrapy-playwright = "zed_scrapy_playwright:main"
 
 [build-system]
 requires = ["uv_build>=0.12.5,<0.13.0"]
 build-backend = "uv_build"
+
+[tool.uv.workspace]
+# members：列出工作区内所有子包所在的目录（每个目录下应有一个 pyproject.toml）。
+members = [
+    "packages/zed-sp-schedule",
+    "packages/zed-sp-translate",
+]
+
+# zed-sp-schedule = { workspace = true }：表示当有包依赖 zed-sp-schedule 时，直接从工作区内部引用，而不是从 PyPI 下载。
+[tool.uv.sources]
+zed-sp-schedule = { workspace = true }
+zed-sp-translate = { workspace = true }
+zed-scrapy-playwright = { workspace = true }

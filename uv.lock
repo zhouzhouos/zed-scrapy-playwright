@@ -6,6 +6,13 @@ resolution-markers = [
     "python_full_version < '3.13'",
 ]
 
+[manifest]
+members = [
+    "zed-scrapy-playwright",
+    "zed-sp-schedule",
+    "zed-sp-translate",
+]
+
 [[package]]
 name = "asttokens"
 version = "3.0.2"
@@ -1025,7 +1032,7 @@ wheels = [
 
 [[package]]
 name = "zed-scrapy-playwright"
-version = "0.2.1"
+version = "0.3.0a1"
 source = { editable = "." }
 dependencies = [
     { name = "icecream" },
@@ -1035,6 +1042,18 @@ dependencies = [
     { name = "scrapy" },
 ]
 
+[package.optional-dependencies]
+all = [
+    { name = "zed-sp-schedule" },
+    { name = "zed-sp-translate" },
+]
+schedule = [
+    { name = "zed-sp-schedule" },
+]
+translate = [
+    { name = "zed-sp-translate" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "icecream", specifier = ">=2.2.0" },
@@ -1042,7 +1061,28 @@ requires-dist = [
     { name = "playwright-stealth", specifier = ">=2.0.3" },
     { name = "pytest", specifier = ">=9.1.1" },
     { name = "scrapy", specifier = ">=2.18.0" },
+    { name = "zed-sp-schedule", marker = "extra == 'all'", editable = "packages/zed-sp-schedule" },
+    { name = "zed-sp-schedule", marker = "extra == 'schedule'", editable = "packages/zed-sp-schedule" },
+    { name = "zed-sp-translate", marker = "extra == 'all'", editable = "packages/zed-sp-translate" },
+    { name = "zed-sp-translate", marker = "extra == 'translate'", editable = "packages/zed-sp-translate" },
 ]
+provides-extras = ["all", "schedule", "translate"]
+
+[[package]]
+name = "zed-sp-schedule"
+version = "0.1.1a0"
+source = { editable = "packages/zed-sp-schedule" }
+dependencies = [
+    { name = "zed-scrapy-playwright" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "zed-scrapy-playwright", editable = "." }]
+
+[[package]]
+name = "zed-sp-translate"
+version = "0.1.0.dev0"
+source = { editable = "packages/zed-sp-translate" }
 
 [[package]]
 name = "zope-interface"
