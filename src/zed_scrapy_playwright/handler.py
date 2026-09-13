@@ -9,30 +9,60 @@
 
 import importlib.util
 import logging
+import sys
 from typing import cast
 
-import scrapy.http
-from playwright.async_api import async_playwright
-from playwright_stealth import Stealth
+# import scrapy.http
+# from playwright.async_api import async_playwright
+# from playwright_stealth import Stealth
 from scrapy import Request, crawler, signals
-from scrapy.exceptions import IgnoreRequest
+
+# from scrapy.exceptions import IgnoreRequest
 from scrapy.utils.log import SpiderLoggerAdapter
 
-from zed_scrapy_playwright import constants
+from zed_scrapy_playwright import constants, default
 from zed_scrapy_playwright import definition as Z
 from zed_scrapy_playwright import interface as I
-from zed_scrapy_playwright.provider import DefaultProvider
 
-# HAS_SCHEDULE_MODULE = importlib.util.find_spec("zed_sp_schedule") is not None
-# HAS_TRANSLATE_MODULE = importlib.util.find_spec("zed_sp_translate") is not None
 
-# if HAS_SCHEDULE_MODULE:
-#     import zed_sp_schedule
-# if HAS_TRANSLATE_MODULE:
-#     import zed_sp_translate
+def parse_settings(items, multi_keys=None):
+    multi_keys = multi_keys or set()
+    result = {}
+    for item in items:
+        key, _, value = item.partition("=")
+        if key in multi_keys:
+            result.setdefault(key, []).append(value)
+        else:
+            result[key] = value
+    return result
 
-HAS_SCHEDULE_MODULE = False
-HAS_TRANSLATE_MODULE = False
+
+CLI_ARGS = parse_settings(sys.argv, multi_keys={"extra"})
+print(CLI_ARGS)
+if CLI_ARGS.get("dev"):
+    HAS_SCHEDULE_MODULE = False
+    HAS_TRANSLATE_MODULE = False
+
+    extras = CLI_ARGS.get("extra", [])
+
+    if "schedule" in extras:
+        import zed_sp_schedule
+
+        HAS_SCHEDULE_MODULE = True
+    if "translate" in extras:
+        import zed_sp_translate
+
+        HAS_TRANSLATE_MODULE = True
+else:
+    HAS_SCHEDULE_MODULE = importlib.util.find_spec("zed_sp_schedule") is not None
+    HAS_TRANSLATE_MODULE = importlib.util.find_spec("zed_sp_translate") is not None
+
+    if HAS_SCHEDULE_MODULE:
+        import zed_sp_schedule
+    if HAS_TRANSLATE_MODULE:
+        import zed_sp_translate
+
+print(f"{HAS_SCHEDULE_MODULE=} {HAS_TRANSLATE_MODULE=}")
 
 
 class PlaywrightDownloaderMiddleware:
@@ -123,21 +153,26 @@ class PlaywrightDownloaderMiddleware:
         self.logger.info("spider_opened, start the initialization of async playwright")
 
         # create the resource provider
-        CustomProvider = (
-            DefaultProvider if not HAS_SCHEDULE_MODULE else zed_sp_schedule.Provider
-        )
-
-        if config_dictionary := getattr(self.c.spider, "config", None):
+        config_dictionary = getattr(self.c.spider, "config", None)
+        if config_dictionary:
             info = cast(I.ConfigDict, config_dictionary)
-            self.provider = await CustomProvider(info).start()
+            if HAS_SCHEDULE_MODULE:
+                self.provider = await zed_sp_schedule.Provider(info).start()
+            else:
+                self.provider = await default.Provider(info).start()
         else:
-            self.provider = await DefaultProvider(None).start()
+            self.provider = await default.Provider(None).start()
 
         self.logger.warning(f"{type(self.provider)}")
 
         # create the method translator
-        if HAS_TRANSLATE_MODULE:
-            ...
+        # Translator = (
+        #     DefaultTranslator
+        #     if not HAS_TRANSLATE_MODULE
+        #     else zed_sp_translate.Translator
+        # )
+        # if HAS_TRANSLATE_MODULE:
+        #     ...
 
     @property
     def logger(self) -> SpiderLoggerAdapter:

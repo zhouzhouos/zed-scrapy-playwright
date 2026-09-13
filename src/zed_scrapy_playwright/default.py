@@ -13,10 +13,20 @@ from zed_scrapy_playwright import definition as Z
 from zed_scrapy_playwright import interface as I
 
 
-class DefaultProvider(I.Provider):
+class Provider(I.Provider):
     """moren"""
 
+    async def _start(self):
+        self.playwright_context_manager = async_playwright()
+        self.playwright = await self.playwright_context_manager.start()
+        self.default_browser = await self.playwright.chromium.launch()
+        self.default_context = await self.default_browser.new_context()
+        return self
+
     async def start(self):
+        if self.config is None:
+            return await self._start()
+
         self.playwright_context_manager = async_playwright()
         self.playwright = await self.playwright_context_manager.start()
         # self.default_browser = await self.playwright.chromium.launch()

@@ -49,8 +49,7 @@ class Provider(ABC):
 
     def __init__(self, info: ConfigDict | None) -> None:
         super().__init__()
-        if info:
-            self.config = info
+        self.config = info
 
     @abstractmethod
     async def start(self) -> Self:
